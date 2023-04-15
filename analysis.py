@@ -95,7 +95,7 @@ def count_messages(df : pd.DataFrame):
 
     sorted_authors = sorted(author_counts.items(), key=lambda x: x[1], reverse=True)
     for author, count in sorted_authors:
-        print(f"{author}: {count}") 
+        print(f"{author}: {count}")
     
 
 # Create WordCloud
@@ -122,7 +122,7 @@ def create_wordcloud(message_str : str):
 
 if __name__ == "__main__":
     # Load chat log data
-    chat_file = "chats/lennart_chat.txt"
+    chat_file = "chats/test_chat.txt"
     with open(chat_file, "r") as file:
         chat_log = file.readlines()
 

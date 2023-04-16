@@ -3,6 +3,7 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import emoji
+import datetime as dt
 
 import nltk
 from nltk.corpus import stopwords as nltk_stopwords
@@ -16,13 +17,73 @@ from collections import Counter
 from tabulate import tabulate
 from wordcloud import WordCloud, STOPWORDS
 
-from word_lists import system_messages
+from word_lists import system_messages, irrelevant_words
 
 
 # Create a function to calculate sentiment scores for German text
 def calculate_sentiment(text):
     blob = TextBlob(text)
     return blob.sentiment.polarity
+
+# Removes emoji of a string
+def remove_emoji(string):
+        emoji_pattern = re.compile("["
+            u"\U0001F600-\U0001F64F"  # emoticons
+            u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+            u"\U0001F680-\U0001F6FF"  # transport & map symbols
+            u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+            u"\U000024C2-\U0001F251"
+            u"\U0001f926-\U0001f937"
+            u"\U00010000-\U0010ffff"
+            u"\u2600-\u2B55"
+            u"\u200d"
+            u"\u23cf"
+            u"\u23e9"
+            u"\u231a"
+            u"\ufe0f"                 # dingbats
+            u"\u3030"
+                               "]+", flags=re.UNICODE)
+        return emoji_pattern.sub(r'', string)
+
+# Changes the order of the dates
+def change_date_format(df : pd.DataFrame):
+    df["Date"] = df["Date"].apply(lambda x: x.split(",")[0])#.replace("/", ".")
+    for i in range(len(df)):
+        # Split the date string into year, month, and day
+        day, month, year = df.loc[i, "Date"].replace("/",".").split(".")
+        
+        # Concatenate the year, month, and day in the desired order
+        new_date = "{}-{}-{}".format(year, month, day)
+        
+        # Update the DataFrame with the new date format
+        df.loc[i, "Date"] = new_date
+    
+    return df
+
+def change_time_format(df : pd.DataFrame, system_language : str, operation_system : str):
+    for i in range(len(df)):
+        if system_language == "ger":
+            if operation_system == "apple":
+                time_obj = dt.datetime.strptime(df.loc[i, "Time"], '%H:%M:%S').time()
+                time_str = time_obj.strftime('%H:%M')
+                df.loc[i, "Time_obj"] = time_obj
+                df.loc[i, "Time"] = time_str
+            elif operation_system == "android":
+                time_obj = dt.datetime.strptime(df.loc[i, "Time"], '%H:%M').time()
+                df.loc[i, "Time_obj"] = time_obj
+        elif system_language == "eng":
+                time_obj = dt.datetime.strptime(df.loc[i, "Time"], '%I:%M:%S %p').time() 
+                time_str = time_obj.strftime('%H:%M')
+                df.loc[i, "Time_obj"] = time_obj
+                df.loc[i, "Time"] = time_str
+    return df                
+            # time_obj = datetime.strptime(time_string, '%H:%M').time()
+            # format_time = datetime.time(3, 12, 24, 10)
+        
+    # 20:22:06 sys ger oper apple
+    # 12:27 sys ger oper android
+    # 8:17:43 AM sys eng 
+    
 
 # Perform sentiment analysis on english messages
 def sentiment_analysis(chat_language : str, df : pd.DataFrame):
@@ -80,8 +141,6 @@ def emojis_extraction(df : pd.DataFrame):
         table.append([str(i+1)+".", element, count, "times"])
     print(tabulate(table, headers=[], tablefmt="plain"))
     
-    
-
 
 # Count the occurrences of each author
 def count_messages(df : pd.DataFrame):
@@ -100,7 +159,6 @@ def count_messages(df : pd.DataFrame):
 
 # Create WordCloud
 def create_wordcloud(message_str : str):
-    irrelevant_words = ['omitted', 'audio', 'image', 'https', 'sticker', 'joined', 'deleted', 'using', 'invite', 'link', 'group', 's', 'vm']
     stopset = set(nltk_stopwords.words('german') + irrelevant_words)
     STOPWORDS.update(stopset)
 
@@ -119,24 +177,78 @@ def create_wordcloud(message_str : str):
     plt.imshow(wordcloud, interpolation='bilinear')
     plt.show()
 
+# Creates a timeline depicting the number of messages chat participants write in a day
+def timeline(df : pd.DataFrame):
+    df["Author"] = df["Author"].apply(remove_emoji)
+    
+    # count the number of messages per author per day
+    df_timeline = df.groupby(["Date", "Author"]).count()["Message"]
+    df_timeline = pd.DataFrame(df_timeline).reset_index()
+    
+    # get the 6 authors with the highest message counts
+    top_authors = df_timeline.groupby("Author").sum()["Message"].nlargest(6).index
+    df_timeline = df_timeline[df_timeline["Author"].isin(top_authors)]
+    df_timeline = df_timeline.sort_values("Date")
+    
+    # pivot the table to create a table with the dates as the index and each author's message count as a column
+    df_timeline = df_timeline.pivot(index="Date", columns="Author", values="Message")
+    
+    ax = df_timeline.plot(kind="line", marker="o", figsize=(14, 8), markersize=5)
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Number of Messages")    
+    plt.show()
+
+def week_overview(df : pd.DataFrame):
+    df["Hour"] = df["Time_obj"].apply(lambda x: x.hour)
+    
+    # Count the number of messages for each hour
+    hour_counts = df.groupby("Hour")["Message"].count()
+    
+    # Create a bar chart of the message counts
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(hour_counts.index, hour_counts.values)
+    ax.set_title("Chat Activity by Hour")
+    ax.set_xlabel("Hour of Day")
+    ax.set_ylabel("Number of Messages")
+    ax.set_xticks(range(24))
+    plt.show()
+    
+def week_overview2(df : pd.DataFrame):
+    # df["Author"] = df["Message"].apply(lambda x: x.split(":")[0])
+    df["Hour"] = df["Time_obj"].apply(lambda x: x.hour)
+
+    # Count the number of messages for each hour
+    hour_counts = df.groupby("Hour")["Message"].count()
+    
+    # Create a scatter plot to visualize the number of messages per day per author
+    plt.figure(figsize=(12, 8))
+    plt.scatter(x=hour_counts.index, y=hour_counts.values, s=120)
+    plt.xlabel("Hour of day")
+    plt.ylabel("Number of Messages")
+    plt.title("Number of Messages per Day per Author")
+    plt.show()
 
 if __name__ == "__main__":
     # Load chat log data
-    chat_file = "chats/test_chat.txt"
+    chat_file = "chats/helena_chat.txt"
     with open(chat_file, "r") as file:
         chat_log = file.readlines()
 
     # Extract chat messages
     chat_language = "ger"       #alternatively eng
-    system_language = "eng"     #alternatively ger
+    system_language = "ger"     #alternatively ger
     operation_system = "apple"  #alternatively android
     if system_language == "ger":
         if operation_system == "apple":
-            pattern = r"\[(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2}:\d{2}\]) ([^:]*): (.*)"
+            pattern = r"\[(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2}:\d{2})\] ([^:]*): (.*)"
+            # 20:22:06 sys ger oper apple
         if operation_system == "android":
             pattern = r"(\d{2}\.\d{2}\.\d{2}), (\d{2}:\d{2}) - ([^:]*): (.*)"
+            # 12:27 sys ger oper android
     elif system_language == "eng":
         pattern = r"\[(\d{2}\.\d{2}\.\d{2}), (\d{1,2}:\d{2}:\d{2} [AP]M)\] ([^:]*): (.*)"
+            # 8:17:43 AM sys eng 
+    
     
     # Extract chat messages into a DataFrame
     messages = []
@@ -152,19 +264,21 @@ if __name__ == "__main__":
             date, time, author, message = match.groups()
             messages.append((date, time, author, message))
     df = pd.DataFrame(messages, columns=["Date", "Time", "Author", "Message"])
-    
-    # print("\n")
-    # print(df["Date"])
-    # print(df["Time"])
-    # print("\n")
-
-    
+        
     # Extract all messages in one string
     message_str = ""
     for message in df["Message"]:
         message_str = message_str + " " + message        
     
+    df = change_date_format(df)
+    df = change_time_format(df, system_language, operation_system)
+    
+    plt.style.use('dark_background')
+    
     sentiment_analysis(chat_language, df)
     emojis_extraction(df)
     count_messages(df)
-    create_wordcloud(message_str)    
+    create_wordcloud(message_str)  
+    timeline(df)
+    week_overview(df)  
+    week_overview2(df)  

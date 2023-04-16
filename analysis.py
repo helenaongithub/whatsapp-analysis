@@ -35,7 +35,7 @@ def sentiment_analysis(chat_language : str, df : pd.DataFrame):
         positive = df["pos"].sum()
         negative = df["neg"].sum()
         neutral = df["neu"].sum()
-        
+
     # Perform sentiment analysis on german messages
     if chat_language == "ger":
         df["sentiment"] = df["Message"].apply(calculate_sentiment)
@@ -52,10 +52,10 @@ def sentiment_analysis(chat_language : str, df : pd.DataFrame):
         if chat_language == "eng": print(round(negative/df.shape[0], 4))
     else:
         print("The overall sentiment is neutral.")
-        
+
     if chat_language == "ger": print(f"The average value is {round(average, 4)}.\n")
-    
-   
+
+
 # Extract all emojis in messages
 def emojis_extraction(df : pd.DataFrame):
     emojis = []
@@ -67,7 +67,7 @@ def emojis_extraction(df : pd.DataFrame):
         list_emoji = [emoji.emojize(x) for x in message]
         emojis.extend(list_emoji)
     counter = Counter(emojis)
-    
+
     # Get the most common elements and their counts
     most_common = counter.most_common()
 
@@ -79,8 +79,8 @@ def emojis_extraction(df : pd.DataFrame):
             break
         table.append([str(i+1)+".", element, count, "times"])
     print(tabulate(table, headers=[], tablefmt="plain"))
-    
-    
+
+
 
 
 # Count the occurrences of each author
@@ -96,7 +96,7 @@ def count_messages(df : pd.DataFrame):
     sorted_authors = sorted(author_counts.items(), key=lambda x: x[1], reverse=True)
     for author, count in sorted_authors:
         print(f"{author}: {count}")
-    
+
 
 # Create WordCloud
 def create_wordcloud(message_str : str):
@@ -119,6 +119,11 @@ def create_wordcloud(message_str : str):
     plt.imshow(wordcloud, interpolation='bilinear')
     plt.show()
 
+def create_user_wordcloud(df,author:str):
+    usertext=" ".join(list(kkletter_df.loc[kkletter_df["Author"]==author]["Message"]))
+    create_wordcloud(usertext)
+
+
 
 if __name__ == "__main__":
     # Load chat log data
@@ -137,7 +142,7 @@ if __name__ == "__main__":
             pattern = r"(\d{2}\.\d{2}\.\d{2}), (\d{2}:\d{2}) - ([^:]*): (.*)"
     elif system_language == "eng":
         pattern = r"\[(\d{2}\.\d{2}\.\d{2}), (\d{1,2}:\d{2}:\d{2} [AP]M)\] ([^:]*): (.*)"
-    
+
     # Extract chat messages into a DataFrame
     messages = []
     for line in chat_log:
@@ -146,25 +151,25 @@ if __name__ == "__main__":
             if system_message in line:
                 irrelevant = True
         if irrelevant == True:
-            continue        
+            continue
         match = re.search(pattern, line)
         if match:
             date, time, author, message = match.groups()
             messages.append((date, time, author, message))
     df = pd.DataFrame(messages, columns=["Date", "Time", "Author", "Message"])
-    
+
     # print("\n")
     # print(df["Date"])
     # print(df["Time"])
     # print("\n")
 
-    
+
     # Extract all messages in one string
     message_str = ""
     for message in df["Message"]:
-        message_str = message_str + " " + message        
-    
+        message_str = message_str + " " + message
+
     sentiment_analysis(chat_language, df)
     emojis_extraction(df)
     count_messages(df)
-    create_wordcloud(message_str)    
+    create_wordcloud(message_str)

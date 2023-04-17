@@ -2,6 +2,7 @@
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 import emoji
 import datetime as dt
 
@@ -84,6 +85,15 @@ def change_time_format(df : pd.DataFrame, system_language : str, operation_syste
     # 12:27 sys ger oper android
     # 8:17:43 AM sys eng 
     
+def get_number_of_messages_per_author(df : pd.DataFrame):
+    author_counts = {}
+    for author in df["Author"]:
+        if author not in author_counts:
+            author_counts[author] = 1
+        else:
+            author_counts[author] += 1
+    return author_counts 
+
 
 # Perform sentiment analysis on english messages
 def sentiment_analysis(chat_language : str, df : pd.DataFrame):
@@ -143,15 +153,9 @@ def emojis_extraction(df : pd.DataFrame):
     
 
 # Count the occurrences of each author
-def count_messages(df : pd.DataFrame):
+def count_messages_descending(df : pd.DataFrame):
     print("\nRanking in terms of the number of messages written:")
-    author_counts = {}
-    for author in df["Author"]:
-        if author not in author_counts:
-            author_counts[author] = 1
-        else:
-            author_counts[author] += 1
-
+    author_counts = get_number_of_messages_per_author(df)
     sorted_authors = sorted(author_counts.items(), key=lambda x: x[1], reverse=True)
     for author, count in sorted_authors:
         print(f"{author}: {count}")
@@ -175,7 +179,13 @@ def create_wordcloud(message_str : str):
 
     # display wordcloud
     plt.imshow(wordcloud, interpolation='bilinear')
-    plt.show()
+    path = os.path.join("plots", "wordcloud")
+    plt.savefig(path)
+    
+# Create User WordCloud
+def create_user_wordcloud(df,author:str):
+    usertext=" ".join(list(df.loc[df["Author"]==author]["Message"]))
+    create_wordcloud(usertext)
 
 # Creates a timeline depicting the number of messages chat participants write in a day
 def timeline(df : pd.DataFrame):
@@ -186,7 +196,7 @@ def timeline(df : pd.DataFrame):
     df_timeline = pd.DataFrame(df_timeline).reset_index()
     
     # get the 6 authors with the highest message counts
-    top_authors = df_timeline.groupby("Author").sum()["Message"].nlargest(6).index
+    top_authors = df_timeline.groupby("Author").sum()["Message"].nlargest(9).index
     df_timeline = df_timeline[df_timeline["Author"].isin(top_authors)]
     df_timeline = df_timeline.sort_values("Date")
     
@@ -194,11 +204,14 @@ def timeline(df : pd.DataFrame):
     df_timeline = df_timeline.pivot(index="Date", columns="Author", values="Message")
     
     ax = df_timeline.plot(kind="line", marker="o", figsize=(14, 8), markersize=5)
+    ax.set_title("Timeline of Chat Activity")
     ax.set_xlabel("Date")
     ax.set_ylabel("Number of Messages")    
-    plt.show()
-
-def week_overview(df : pd.DataFrame):
+    path = os.path.join("plots", "timeline")
+    plt.savefig(path)
+    
+def activity_per_hour(df : pd.DataFrame):
+    df["Author"] = df["Author"].apply(remove_emoji)
     df["Hour"] = df["Time_obj"].apply(lambda x: x.hour)
     
     # Count the number of messages for each hour
@@ -211,37 +224,36 @@ def week_overview(df : pd.DataFrame):
     ax.set_xlabel("Hour of Day")
     ax.set_ylabel("Number of Messages")
     ax.set_xticks(range(24))
-    plt.show()
-    
-def week_overview2(df : pd.DataFrame):
-    # df["Author"] = df["Message"].apply(lambda x: x.split(":")[0])
+    path = os.path.join("plots", "activity_per_hour")
+    plt.savefig(path)
+
+def activity_per_hour_and_author(df : pd.DataFrame):
+    df["Author"] = df["Author"].apply(remove_emoji)
     df["Hour"] = df["Time_obj"].apply(lambda x: x.hour)
-
-    # Count the number of messages for each hour
-    hour_counts = df.groupby("Hour")["Message"].count()
+    author_counts = df.groupby(["Hour", "Author"])["Message"].count().reset_index()
+    pivot_table = author_counts.pivot(index="Hour", columns="Author", values="Message")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    pivot_table.plot(kind="bar", ax=ax, stacked=True)
+    ax.set_title("Chat Activity by Hour and Author")
+    ax.set_xlabel("Hour of Day")
+    ax.set_ylabel("Number of Messages")
+    ax.set_xticks(range(24))
+    path = os.path.join("plots", "activity_per_hour_and_author")
+    plt.savefig(path)
     
-    # Create a scatter plot to visualize the number of messages per day per author
-    plt.figure(figsize=(12, 8))
-    plt.scatter(x=hour_counts.index, y=hour_counts.values, s=120)
-    plt.xlabel("Hour of day")
-    plt.ylabel("Number of Messages")
-    plt.title("Number of Messages per Day per Author")
-    plt.show()
-def create_user_wordcloud(df,author:str):
-    usertext=" ".join(list(kkletter_df.loc[kkletter_df["Author"]==author]["Message"]))
-    create_wordcloud(usertext)
-
 
 
 if __name__ == "__main__":
+    os.makedirs("chats", exist_ok=True)
+    os.makedirs("plots", exist_ok=True)
     # Load chat log data
-    chat_file = "chats/helena_chat.txt"
+    chat_file = "chats/test_chat.txt"
     with open(chat_file, "r") as file:
         chat_log = file.readlines()
 
     # Extract chat messages
     chat_language = "ger"       #alternatively eng
-    system_language = "ger"     #alternatively ger
+    system_language = "eng"     #alternatively ger
     operation_system = "apple"  #alternatively android
     if system_language == "ger":
         if operation_system == "apple":
@@ -270,12 +282,6 @@ if __name__ == "__main__":
             messages.append((date, time, author, message))
     df = pd.DataFrame(messages, columns=["Date", "Time", "Author", "Message"])
     
-    # print("\n")
-    # print(df["Date"])
-    # print(df["Time"])
-    # print("\n")
-
-    
     # Extract all messages in one string
     message_str = ""
     for message in df["Message"]:
@@ -288,8 +294,10 @@ if __name__ == "__main__":
     
     sentiment_analysis(chat_language, df)
     emojis_extraction(df)
-    count_messages(df)
+    count_messages_descending(df)
     create_wordcloud(message_str)  
     timeline(df)
-    week_overview(df)  
-    week_overview2(df)  
+    if len(get_number_of_messages_per_author(df)) > 5:
+        activity_per_hour(df)
+    else:
+        activity_per_hour_and_author(df)  

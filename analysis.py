@@ -64,7 +64,7 @@ def change_date_format(df : pd.DataFrame):
 def change_time_format(df : pd.DataFrame, system_language : str, operation_system : str):
     for i in range(len(df)):
         if system_language == "ger":
-            if operation_system == "apple":
+            if operation_system == "IOS":
                 time_obj = dt.datetime.strptime(df.loc[i, "Time"], '%H:%M:%S').time()
                 time_str = time_obj.strftime('%H:%M')
                 df.loc[i, "Time_obj"] = time_obj
@@ -81,7 +81,7 @@ def change_time_format(df : pd.DataFrame, system_language : str, operation_syste
             # time_obj = datetime.strptime(time_string, '%H:%M').time()
             # format_time = datetime.time(3, 12, 24, 10)
         
-    # 20:22:06 sys ger oper apple
+    # 20:22:06 sys ger oper IOS
     # 12:27 sys ger oper android
     # 8:17:43 AM sys eng 
     
@@ -254,11 +254,11 @@ if __name__ == "__main__":
     # Extract chat messages
     chat_language = "ger"       #alternatively eng
     system_language = "eng"     #alternatively ger
-    operation_system = "apple"  #alternatively android
+    operation_system = "IOS"  #alternatively android
     if system_language == "ger":
-        if operation_system == "apple":
+        if operation_system == "IOS":
             pattern = r"\[(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2}:\d{2})\] ([^:]*): (.*)"
-            # 20:22:06 sys ger oper apple
+            # 20:22:06 sys ger oper IOS
         if operation_system == "android":
             pattern = r"(\d{2}\.\d{2}\.\d{2}), (\d{2}:\d{2}) - ([^:]*): (.*)"
             # 12:27 sys ger oper android

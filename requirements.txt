@@ -1,0 +1,7 @@
+emoji==2.2.0
+matplotlib==3.7.1
+nltk==3.8.1
+pandas==2.0.0
+tabulate==0.9.0
+textblob_de==0.4.3
+wordcloud==1.8.2.2

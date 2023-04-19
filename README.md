@@ -6,6 +6,7 @@ The following functionalities are provided:
 - Calculate the overall sentiment of the chat
 - Count emojis occurences
 - Count the number of messages per author
+- Count first Chat per Author
 - Generate a word cloud
 - Display a message timeline
 - Create a message frequency histogram
@@ -36,10 +37,15 @@ The script calculates the overall sentiment of the chat using sentiment analysis
 
 ### Count Emojis Occurrences
 The script counts the number of times emojis were used in the chat. The result is displayed in a table.
+First the total number and then connected to the responsible authors.
 
 
 ### Count Messages per Author
 The script counts the number of messages each author has sent in the chat. The result is displayed in a table.
+
+
+### Count first Chat per Author
+Count the number of times each author was the first to send a message on a given day
 
 
 ### Generate Word Cloud

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import emoji
 import datetime as dt
+# import time
 
 import nltk
 from nltk.corpus import stopwords as nltk_stopwords
@@ -48,15 +49,12 @@ def remove_emoji(string):
 
 # Changes the order of the dates
 def change_date_format(df : pd.DataFrame):
-    df["Date"] = df["Date"].apply(lambda x: x.split(",")[0])#.replace("/", ".")
+    df["Date"] = df["Date"].apply(lambda x: x.split(",")[0])
     for i in range(len(df)):
-        # Split the date string into year, month, and day
         day, month, year = df.loc[i, "Date"].replace("/",".").split(".")
-        
-        # Concatenate the year, month, and day in the desired order
+        if int(year) > 99:
+            year = year[2:]
         new_date = "{}-{}-{}".format(year, month, day)
-        
-        # Update the DataFrame with the new date format
         df.loc[i, "Date"] = new_date
     
     return df
@@ -78,13 +76,7 @@ def change_time_format(df : pd.DataFrame, system_language : str, operation_syste
                 df.loc[i, "Time_obj"] = time_obj
                 df.loc[i, "Time"] = time_str
     return df                
-            # time_obj = datetime.strptime(time_string, '%H:%M').time()
-            # format_time = datetime.time(3, 12, 24, 10)
         
-    # 20:22:06 sys ger oper IOS
-    # 12:27 sys ger oper android
-    # 8:17:43 AM sys eng 
-    
 def get_number_of_messages_per_author(df : pd.DataFrame):
     author_counts = {}
     for author in df["Author"]:
@@ -150,15 +142,59 @@ def emojis_extraction(df : pd.DataFrame):
             break
         table.append([str(i+1)+".", element, count, "times"])
     print(tabulate(table, headers=[], tablefmt="plain"))
+    print("\n")
     
+def emojis_extraction_by_author(df: pd.DataFrame):
+    emojis_by_author = {}
+    for author in df["Author"].unique():
+        emojis = []
+        for message in df[df["Author"] == author]["Message"]:
+            message = emoji.demojize(message)
+            message = re.findall(r'(:[^:]*:)', message)
+            if ": https:" in message:
+                message.remove(": https:")
+            list_emoji = [emoji.emojize(x) for x in message]
+            emojis.extend(list_emoji)
+        counter = Counter(emojis)
+        emojis_by_author[author] = counter
+
+    # Print the ranking for each author
+    for author, counter in emojis_by_author.items():
+        most_common = counter.most_common()
+        table = []
+        print(f"Ranking of most frequent emojis for {author}:")
+        for i, (element, count) in enumerate(most_common):
+            if i >= 10:
+                break
+            table.append([str(i+1)+".", element, count, "times"])
+        print(tabulate(table, headers=[], tablefmt="plain"))
+        print("\n")
 
 # Count the occurrences of each author
 def count_messages_descending(df : pd.DataFrame):
-    print("\nRanking in terms of the number of messages written:")
+    print("Ranking in terms of the number of messages written:")
     author_counts = get_number_of_messages_per_author(df)
     sorted_authors = sorted(author_counts.items(), key=lambda x: x[1], reverse=True)
     for author, count in sorted_authors:
         print(f"{author}: {count}")
+    print("\n")
+    
+# Count the number of times each person was the first to send a message on a given day
+def first_author_per_day(df):
+    df['Date_Obj'] = pd.to_datetime(df['Date'], format='%y-%m-%d')
+    unique_dates = pd.Series(df['Date_Obj'].unique())
+    first_author_count = {}
+    for date in unique_dates:
+        messages_on_date = df[df['Date_Obj'] == date]
+        first_author = messages_on_date.iloc[0]['Author']
+        if first_author in first_author_count:
+            first_author_count[first_author] += 1
+        else:
+            first_author_count[first_author] = 1
+    sorted_authors = sorted(first_author_count.items(), key=lambda x: x[1], reverse=True)
+    for author, count in sorted_authors:
+        print(f"{author} was the first to text on {count} days.")
+    print("\n")
 
 
 # Create WordCloud
@@ -242,8 +278,9 @@ def activity_per_hour_and_author(df : pd.DataFrame):
     plt.savefig(path)
     
 
-
 if __name__ == "__main__":
+    # start_time = time.time()
+    
     os.makedirs("chats", exist_ok=True)
     os.makedirs("plots", exist_ok=True)
     # Load chat log data
@@ -258,14 +295,10 @@ if __name__ == "__main__":
     if system_language == "ger":
         if operation_system == "IOS":
             pattern = r"\[(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2}:\d{2})\] ([^:]*): (.*)"
-            # 20:22:06 sys ger oper IOS
         if operation_system == "android":
             pattern = r"(\d{2}\.\d{2}\.\d{2}), (\d{2}:\d{2}) - ([^:]*): (.*)"
-            # 12:27 sys ger oper android
     elif system_language == "eng":
         pattern = r"\[(\d{2}\.\d{2}\.\d{2}), (\d{1,2}:\d{2}:\d{2} [AP]M)\] ([^:]*): (.*)"
-            # 8:17:43 AM sys eng 
-    
     
     # Extract chat messages into a DataFrame
     messages = []
@@ -278,8 +311,8 @@ if __name__ == "__main__":
             continue
         match = re.search(pattern, line)
         if match:
-            date, time, author, message = match.groups()
-            messages.append((date, time, author, message))
+            date, time_chat, author, message = match.groups()
+            messages.append((date, time_chat, author, message))
     df = pd.DataFrame(messages, columns=["Date", "Time", "Author", "Message"])
     
     # Extract all messages in one string
@@ -294,10 +327,17 @@ if __name__ == "__main__":
     
     sentiment_analysis(chat_language, df)
     emojis_extraction(df)
+    emojis_extraction_by_author(df)
     count_messages_descending(df)
+    first_author_per_day(df)
     create_wordcloud(message_str)  
     timeline(df)
     if len(get_number_of_messages_per_author(df)) > 5:
         activity_per_hour(df)
     else:
-        activity_per_hour_and_author(df)  
+        activity_per_hour_and_author(df) 
+    
+    # end_time = time.time()
+    # total_time = end_time - start_time
+
+    # print("Execution time:", total_time, "seconds")

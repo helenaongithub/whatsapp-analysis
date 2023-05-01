@@ -124,9 +124,7 @@ def emojis_extraction(df : pd.DataFrame):
     emojis = []
     for message in df["Message"]:
         message = emoji.demojize(message)
-        message = re.findall(r'(:[^:]*:)', message)
-        if ": https:" in message:
-            message.remove(": https:")
+        message = re.findall(r'(:[^:\s]*:)', message)
         list_emoji = [emoji.emojize(x) for x in message]
         emojis.extend(list_emoji)
     counter = Counter(emojis)
@@ -140,7 +138,10 @@ def emojis_extraction(df : pd.DataFrame):
     for i, (element, count) in enumerate(most_common):
         if i >= 10:
             break
-        table.append([str(i+1)+".", element, count, "times"])
+        if count == 1:
+            table.append([str(i+1)+".", element, count, "time"])
+        else:
+            table.append([str(i+1)+".", element, count, "times"])
     print(tabulate(table, headers=[], tablefmt="plain"))
     print("\n")
     
@@ -150,9 +151,7 @@ def emojis_extraction_by_author(df: pd.DataFrame):
         emojis = []
         for message in df[df["Author"] == author]["Message"]:
             message = emoji.demojize(message)
-            message = re.findall(r'(:[^:]*:)', message)
-            if ": https:" in message:
-                message.remove(": https:")
+            message = re.findall(r'(:[^:\s]*:)', message)
             list_emoji = [emoji.emojize(x) for x in message]
             emojis.extend(list_emoji)
         counter = Counter(emojis)
@@ -160,13 +159,18 @@ def emojis_extraction_by_author(df: pd.DataFrame):
 
     # Print the ranking for each author
     for author, counter in emojis_by_author.items():
+        if not bool(counter):
+            continue
         most_common = counter.most_common()
         table = []
         print(f"Ranking of most frequent emojis for {author}:")
         for i, (element, count) in enumerate(most_common):
             if i >= 10:
                 break
-            table.append([str(i+1)+".", element, count, "times"])
+            if count == 1:
+                table.append([str(i+1)+".", element, count, "time"])
+            else:
+                table.append([str(i+1)+".", element, count, "times"])
         print(tabulate(table, headers=[], tablefmt="plain"))
         print("\n")
 
@@ -295,6 +299,7 @@ if __name__ == "__main__":
     if system_language == "ger":
         if operation_system == "IOS":
             pattern = r"\[(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2}:\d{2})\] ([^:]*): (.*)"
+            # pattern = r"\[(\d{2}\.\d{2}\.\d{2}), (\d{2}:\d{2}:\d{2})\] ([^:]*): (.*)" # possible pattern
         if operation_system == "android":
             pattern = r"(\d{2}\.\d{2}\.\d{2}), (\d{2}:\d{2}) - ([^:]*): (.*)"
     elif system_language == "eng":
@@ -340,4 +345,4 @@ if __name__ == "__main__":
     # end_time = time.time()
     # total_time = end_time - start_time
 
-    # print("Execution time:", total_time, "seconds")
+    # print("\n\nExecution time:", total_time, "seconds")
